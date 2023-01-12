@@ -1,0 +1,7 @@
+# Edit this file with your own plugin name.
+# Please also change the LibraryTemplate package and class names. 
+name: FireworkShow
+main: org.jgcertified.fireworkshow.FireworkShow
+version: 0.1
+depend: [RedstoneChips]
+api-version: 1.16

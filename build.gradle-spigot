@@ -1,0 +1,118 @@
+import java.text.SimpleDateFormat
+
+plugins {
+    id 'java'
+}
+
+group = "org.jgcertified.combolock"
+
+static def getTime() {
+    SimpleDateFormat sdf = new SimpleDateFormat("yyMMdd-HHmm")
+    sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
+    return sdf.format(new Date()).toString()
+}
+
+// Load version from string
+String shortVersion = null
+try {
+    shortVersion = rootProject.file('version.txt').getText('UTF-8').trim()
+} catch (FileNotFoundException ignored) {
+}
+
+// If no version file found or was empty, use blank string
+if (shortVersion == null || shortVersion == "") {
+    shortVersion = getTime()
+}
+
+// Set version to version property if supplied
+if (hasProperty('ver')) {
+    if (ver.charAt(0) == "v") {
+        shortVersion = ver.substring(1)
+    } else {
+        shortVersion = ver
+    }
+}
+
+// Add snapshot identifier to version
+version = shortVersion + "-SNAPSHOT"
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_16
+    targetCompatibility = JavaVersion.VERSION_16
+}
+
+repositories {
+mavenCentral {
+        content {
+            excludeModule("com.destroystokyo.paper", "paper-api")
+            excludeModule("io.papermc", "paperlib")
+        }
+    }
+
+maven {
+    url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+
+    // As of Gradle 5.1, you can limit this to only those
+    // dependencies you expect from it
+    content {
+      includeGroup 'org.bukkit'
+      includeGroup 'org.spigotmc'
+    }
+  }
+  /*
+   As Spigot-API depends on the Bungeecord ChatComponent-API,
+  we need to add the Sonatype OSS repository, as Gradle,
+  in comparison to maven, doesn't want to understand the ~/.m2
+  directory unless added using mavenLocal(). Maven usually just gets
+  it from there, as most people have run the BuildTools at least once.
+  This is therefore not needed if you're using the full Spigot/CraftBukkit,
+  or if you're using the Bukkit API.
+  */
+  maven { url = 'https://oss.sonatype.org/content/repositories/snapshots' }
+  maven { url = 'https://oss.sonatype.org/content/repositories/central' }
+  // mavenLocal() // This is needed for CraftBukkit and Spigot.
+}
+
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.17-R0.1-SNAPSHOT' // The Spigot API with no shadowing. Requires the OSS repo.
+    compileOnly files('../jar/RedstoneChips.jar')
+    //implementation 'io.papermc:paperlib:1.0.6'
+    //testImplementation 'io.papermc.paper:paper-api:1.17.1-R0.1-SNAPSHOT'
+    //testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    //testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+processResources {
+    filesMatching("**/plugin.yml") {
+        expand ( NAME: rootProject.name, VERSION: version, PACKAGE: project.group.toString() )
+    }
+}
+
+// Disable jar and replace with shadowJar
+jar.enabled = false
+
+task configureRelease {
+    doLast {
+        // Trim the "-SNAPSHOT" extension from version
+        version = shortVersion
+    }
+}
+
+// Make sure configuration runs in the correct order
+build.mustRunAfter(configureRelease)
+
+task release {
+    dependsOn build
+    dependsOn configureRelease
+
+    doLast {
+        // Rename final JAR to trim off version information
+        shadowJar.archiveFile.get().getAsFile()
+                .renameTo(buildDir.toString() + File.separator + 'libs' + File.separator
+                        + rootProject.name + '.jar')
+    }
+}
